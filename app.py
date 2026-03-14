@@ -1,4 +1,4 @@
-# app.py  --  ASL Sign Language Translator  (v16 - Streamlit Cloud, no rerun loop)
+# app.py  --  ASL Sign Language Translator  (v17 - Keras 2/3 fix)
 
 import os, sys, threading, time, queue, datetime, logging, io, base64
 import cv2, numpy as np
@@ -77,12 +77,23 @@ def get_letter_img(letter):
 
 @st.cache_resource(show_spinner="⏳ Loading model…")
 def load_models():
-    from keras.models import load_model
+    # Use tf.keras explicitly to handle Keras 2 → 3 migration (batch_shape issue)
+    import tensorflow as tf
+    import tf_keras
     model_path = os.path.join(ROOT,'models','model.h5')
     if not os.path.exists(model_path):
         st.error(f"Letter model not found at: {model_path}")
         st.stop()
-    return dict(lm=load_model(model_path))
+    try:
+        # First try tf_keras (most compatible with Keras 2 saved models)
+        model = tf_keras.models.load_model(model_path)
+    except Exception:
+        try:
+            model = tf.keras.models.load_model(model_path)
+        except Exception as e:
+            st.error(f"Failed to load model: {e}")
+            st.stop()
+    return dict(lm=model)
 
 _M = load_models()
 
@@ -312,7 +323,6 @@ for k,v in dict(top_mode="sign",sentence=[],history=[],_sp_last="",dark_mode=Tru
     if k not in st.session_state: st.session_state[k]=v
 if not isinstance(st.session_state.sentence,list): st.session_state.sentence=[]
 if not isinstance(st.session_state.history,list): st.session_state.history=[]
-
 if st.session_state.top_mode=="sign": drain()
 
 # ── theme ─────────────────────────────────────────────────────────────────────
