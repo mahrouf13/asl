@@ -1,6 +1,7 @@
 import subprocess
 import sys
 
+# List all required packages
 packages = [
     "numpy",
     "opencv-python-headless",
@@ -13,11 +14,13 @@ packages = [
     "aiortc"
 ]
 
+# Install missing packages dynamically
 for pkg in packages:
     try:
         __import__(pkg)
     except ImportError:
         subprocess.check_call([sys.executable, "-m", "pip", "install", pkg])
+        print(f"Installed {pkg}")
         
 import os, sys, threading, time, queue, datetime, logging, io, base64
 import cv2, numpy as np
