@@ -1,10 +1,11 @@
 streamlit>=1.32.0,<2.0.0
 streamlit-webrtc>=0.47.0
-opencv-python-headless==4.9.0.80
+opencv-python-headless>=4.9.0.80,<5
 mediapipe==0.10.9
-numpy==1.26.4
+numpy>=1.23,<1.26
 tensorflow-cpu==2.13.1
-protobuf<4
+protobuf>=3.20.0,<4
 gTTS>=2.3.1
 av==10.0.0
 aiortc>=1.6.0
+Pillow
