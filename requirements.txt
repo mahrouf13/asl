@@ -7,3 +7,4 @@ tensorflow-cpu>=2.13.0,<2.16.0
 gTTS>=2.3.1
 av>=10.0.0
 aiortc>=1.6.0
+protobuf<4
