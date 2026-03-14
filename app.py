@@ -1,14 +1,19 @@
 import subprocess
 import sys
 
-# List of packages you want to ensure are installed (can be empty)
-required_packages = [
-    "numpy", "opencv-python-headless", "mediapipe", 
-    "tensorflow-cpu", "gTTS", "streamlit", 
-    "streamlit-webrtc", "av", "aiortc"
+packages = [
+    "numpy",
+    "opencv-python-headless",
+    "mediapipe",
+    "tensorflow-cpu",
+    "gTTS",
+    "streamlit",
+    "streamlit-webrtc",
+    "av",
+    "aiortc"
 ]
 
-for pkg in required_packages:
+for pkg in packages:
     try:
         __import__(pkg)
     except ImportError:
