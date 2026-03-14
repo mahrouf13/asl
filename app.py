@@ -1,4 +1,4 @@
-# app.py  --  ASL Sign Language Translator  (v17 - Keras 2/3 fix)
+# app.py  --  ASL Sign Language Translator  (v18 - h5py batch_shape patch)
 
 import os, sys, threading, time, queue, datetime, logging, io, base64
 import cv2, numpy as np
@@ -77,22 +77,38 @@ def get_letter_img(letter):
 
 @st.cache_resource(show_spinner="⏳ Loading model…")
 def load_models():
-    # Use tf.keras explicitly to handle Keras 2 → 3 migration (batch_shape issue)
     import tensorflow as tf
-    import tf_keras
+    import h5py, json, shutil, tempfile
+
     model_path = os.path.join(ROOT,'models','model.h5')
     if not os.path.exists(model_path):
         st.error(f"Letter model not found at: {model_path}")
         st.stop()
+
+    # Work on a temp copy so we never corrupt the original
+    tmp = tempfile.NamedTemporaryFile(suffix='.h5', delete=False)
+    tmp.close()
+    shutil.copy2(model_path, tmp.name)
+
+    # Patch batch_shape → batch_input_shape inside the HDF5 config
     try:
-        # First try tf_keras (most compatible with Keras 2 saved models)
-        model = tf_keras.models.load_model(model_path)
-    except Exception:
-        try:
-            model = tf.keras.models.load_model(model_path)
-        except Exception as e:
-            st.error(f"Failed to load model: {e}")
-            st.stop()
+        with h5py.File(tmp.name, 'r+') as f:
+            if 'model_config' in f.attrs:
+                raw = f.attrs['model_config']
+                if isinstance(raw, bytes):
+                    raw = raw.decode('utf-8')
+                patched = raw.replace('"batch_shape"', '"batch_input_shape"')
+                f.attrs['model_config'] = patched.encode('utf-8')
+    except Exception as e:
+        st.warning(f"Could not patch model config: {e}")
+
+    try:
+        model = tf.keras.models.load_model(tmp.name)
+    except Exception as e:
+        st.error(f"Failed to load model: {e}")
+        st.stop()
+
+    os.unlink(tmp.name)
     return dict(lm=model)
 
 _M = load_models()
