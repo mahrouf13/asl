@@ -1,4 +1,4 @@
-# app.py  --  ASL Sign Language Translator  (v19 - tensorflow 2.16 + keras 3)
+# app.py  --  ASL Sign Language Translator  (v20 - TURN fix + browser mic)
 
 import os, sys, threading, time, queue, datetime, logging, io, base64
 import cv2, numpy as np
@@ -55,10 +55,19 @@ FLASH_FRAMES  = 8
 SPACE_IDX     = len(_LS) - 1
 THR_SPACE     = 0.82; CONSEC_SPACE = 14
 
+# TURN servers — required for WebRTC on Streamlit Cloud
 RTC = RTCConfiguration({"iceServers":[
     {"urls":["stun:stun.l.google.com:19302"]},
     {"urls":["stun:stun1.l.google.com:19302"]},
-    {"urls":["stun:stun2.l.google.com:19302"]},
+    {
+        "urls":[
+            "turn:openrelay.metered.ca:80",
+            "turn:openrelay.metered.ca:443",
+            "turn:openrelay.metered.ca:443?transport=tcp",
+        ],
+        "username":"openrelayproject",
+        "credential":"openrelayproject",
+    },
 ]})
 
 def asset(n):
@@ -292,6 +301,18 @@ def speak(text):
             f'</audio>',unsafe_allow_html=True)
     except Exception as e:
         st.warning(f"🔊 TTS error: {e}")
+
+def transcribe_audio(audio_bytes):
+    """Transcribe audio bytes using Google Speech Recognition."""
+    try:
+        import speech_recognition as sr
+        r = sr.Recognizer()
+        audio_io = io.BytesIO(audio_bytes)
+        with sr.AudioFile(audio_io) as source:
+            audio = r.record(source)
+        return r.recognize_google(audio)
+    except Exception as e:
+        return None
 
 def push_history(text,source):
     if not text.strip(): return
@@ -577,33 +598,68 @@ with cam_col:
         st.markdown("<div style='height:8px'></div>",unsafe_allow_html=True)
         if st.button("🔄 Refresh sentence",key="manual_refresh",use_container_width=True):
             drain(); st.rerun()
+
     else:
+        # ── SPEECH → SIGN ──────────────────────────────────────────────────
         st.markdown(f"""<div class='sp-hero'>
           <h3>🎙 Speech → Sign Letters</h3>
-          <p>Type a sentence — each letter shown as its ASL hand sign</p>
+          <p>Record your voice or type a sentence — each letter shown as its ASL hand sign</p>
         </div>""",unsafe_allow_html=True)
-        st.markdown(f"<div style='font-size:0.75rem;color:{TXT3};margin-bottom:4px;'>"
-                    f"ℹ️ <em>Type your sentence below to see each letter as an ASL sign image.</em></div>",
-                    unsafe_allow_html=True)
-        heard=""
-        typed=st.text_area("Type a sentence:",key="sp_typed",
-                           placeholder="e.g.  hello how are you",height=56)
-        if typed.strip(): heard=typed.strip(); st.session_state._sp_last=heard
-        if not heard: heard=st.session_state.get('_sp_last','')
+
+        # ── Input method tabs ──
+        tab_mic, tab_type = st.tabs(["🎙 Record Voice", "⌨️ Type Text"])
+
+        heard = ""
+
+        with tab_mic:
+            st.markdown(
+                f"<div style='font-size:0.78rem;color:{TXT2};margin-bottom:8px;'>"
+                f"Click the microphone below, speak your sentence, then click stop. "
+                f"Your speech will be transcribed automatically.</div>",
+                unsafe_allow_html=True)
+            # st.audio_input — records from browser mic, returns audio bytes
+            audio_data = st.audio_input("🎙 Click to record", key="mic_input")
+            if audio_data is not None:
+                with st.spinner("🔄 Transcribing…"):
+                    result = transcribe_audio(audio_data.read())
+                if result:
+                    st.success(f"✅ Heard: **{result}**")
+                    heard = result
+                    st.session_state._sp_last = heard
+                else:
+                    st.warning("⚠️ Could not understand audio. Please try again or type below.")
+
+        with tab_type:
+            st.markdown(
+                f"<div style='font-size:0.78rem;color:{TXT2};margin-bottom:8px;'>"
+                f"Type any sentence and see each letter as its ASL hand sign.</div>",
+                unsafe_allow_html=True)
+            typed = st.text_area("Type a sentence:",key="sp_typed",
+                                 placeholder="e.g.  hello how are you",height=68)
+            if typed.strip():
+                heard = typed.strip()
+                st.session_state._sp_last = heard
+
+        # Fall back to last known input if nothing new
+        if not heard:
+            heard = st.session_state.get('_sp_last','')
+
+        # ── Sign display ──
         if heard:
             st.markdown(f"<div class='heard-box'>{heard}</div>",unsafe_allow_html=True)
-            words=heard.strip().split()
-            for wi,word in enumerate(words):
-                clean=word.lower().strip(".,!?;:'\"")
-                letters=[c.upper() for c in clean if c.isalpha()]
+            words = heard.strip().split()
+            for wi, word in enumerate(words):
+                clean = word.lower().strip(".,!?;:'\"")
+                letters = [c.upper() for c in clean if c.isalpha()]
                 st.markdown(f"<div class='ws'><div class='wh'>{clean}</div>",unsafe_allow_html=True)
                 if letters:
-                    n_cols=min(len(letters),8)
-                    cols=st.columns(n_cols)
-                    for li,ch in enumerate(letters):
-                        ip=get_letter_img(ch)
-                        with cols[li%n_cols]:
-                            if ip: st.image(ip,caption=ch,width=90)
+                    n_cols = min(len(letters), 8)
+                    cols = st.columns(n_cols)
+                    for li, ch in enumerate(letters):
+                        ip = get_letter_img(ch)
+                        with cols[li % n_cols]:
+                            if ip:
+                                st.image(ip, caption=ch, width=90)
                             else:
                                 st.markdown(
                                     f"<div style='width:90px;height:90px;"
@@ -613,12 +669,13 @@ with cam_col:
                                     f"monospace;font-size:1.6rem;color:{TXT2};'>{ch}</div>",
                                     unsafe_allow_html=True)
                 st.markdown("</div>",unsafe_allow_html=True)
-                if wi<len(words)-1:
+                if wi < len(words)-1:
                     st.markdown(f"<div class='space-div'>🖐 &nbsp; SPACE</div>",unsafe_allow_html=True)
-            sa1,sa2=st.columns(2,gap="small")
+
+            sa1, sa2 = st.columns(2, gap="small")
             with sa1:
                 if st.button("🔊 Speak aloud",key="sp_speak",use_container_width=True):
                     push_history(heard,"speech"); speak(heard)
             with sa2:
-                if st.button("🔄 Clear input",key="sp_clear",use_container_width=True):
+                if st.button("🔄 Clear",key="sp_clear",use_container_width=True):
                     st.session_state._sp_last=""; st.rerun()
