@@ -1,27 +1,5 @@
-import subprocess
-import sys
+# app.py  --  ASL Sign Language Translator  (v16 - Streamlit Cloud, no rerun loop)
 
-# List all required packages
-packages = [
-    "numpy",
-    "opencv-python-headless",
-    "mediapipe",
-    "tensorflow-cpu",
-    "gTTS",
-    "streamlit",
-    "streamlit-webrtc",
-    "av",
-    "aiortc"
-]
-
-# Install missing packages dynamically
-for pkg in packages:
-    try:
-        __import__(pkg)
-    except ImportError:
-        subprocess.check_call([sys.executable, "-m", "pip", "install", pkg])
-        print(f"Installed {pkg}")
-        
 import os, sys, threading, time, queue, datetime, logging, io, base64
 import cv2, numpy as np
 import streamlit as st
