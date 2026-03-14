@@ -1,39 +1,19 @@
-# app.py  --  ASL Sign Language Translator  (v16 - Streamlit Cloud, no rerun loop)
 import subprocess
 import sys
-import importlib
 
-# List of packages to ensure are installed
-packages = {
-    "streamlit": "streamlit",
-    "streamlit-webrtc": "streamlit_webrtc",
-    "opencv-python-headless": "cv2",
-    "mediapipe": "mediapipe",
-    "numpy": "numpy",
-    "tensorflow-cpu": "tensorflow",
-    "protobuf": "google.protobuf",
-    "gTTS": "gtts",
-    "av": "av",
-    "aiortc": "aiortc",
-    "Pillow": "PIL"
-}
+# List of packages you want to ensure are installed (can be empty)
+required_packages = [
+    "numpy", "opencv-python-headless", "mediapipe", 
+    "tensorflow-cpu", "gTTS", "streamlit", 
+    "streamlit-webrtc", "av", "aiortc"
+]
 
-def install_package(pkg_name):
-    """Install a Python package using pip"""
-    subprocess.check_call([sys.executable, "-m", "pip", "install", pkg_name])
-
-def import_or_install(pkg_name, import_name):
-    """Try to import a package, install if missing"""
+for pkg in required_packages:
     try:
-        importlib.import_module(import_name)
+        __import__(pkg)
     except ImportError:
-        print(f"[INFO] Installing missing package: {pkg_name}")
-        install_package(pkg_name)
-        print(f"[INFO] Installed {pkg_name}")
-
-# Automatically check and install all packages
-for pkg_name, import_name in packages.items():
-    import_or_install(pkg_name, import_name)
+        subprocess.check_call([sys.executable, "-m", "pip", "install", pkg])
+        
 import os, sys, threading, time, queue, datetime, logging, io, base64
 import cv2, numpy as np
 import streamlit as st
